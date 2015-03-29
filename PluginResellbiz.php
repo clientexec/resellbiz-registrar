@@ -1173,7 +1173,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         }
         if (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz error occurred while looking up domain id for ' . $domain . '.  Error: ' . $result->message);
-            throw new Exception('An error occurred while connecting to Resell.biz.  Error: ' . $result->message);
+            throw new CE_Exception('An error occurred while connecting to Resell.biz.  Error: ' . $result->message);
         }
         CE_Lib::log(4, 'ERROR: Resell.biz error occurred while looking up domain id for ' . $domain . '.  Error: Unknown Error.');
         throw new Exception('An error occurred while connecting to Resell.biz.  Error: Unknown');
