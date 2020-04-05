@@ -1,13 +1,18 @@
 <?php
 require_once 'modules/admin/models/RegistrarPlugin.php';
 require_once 'library/CE/NE_Network.php';
-require_once 'modules/domains/models/ICanImportDomains.php';
 
 /**
 * @package Plugins
 */
-class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
+class PluginResellbiz extends RegistrarPlugin
 {
+    public $features = [
+        'nameSuggest' => false,
+        'importDomains' => true,
+        'importPrices' => false,
+    ];
+
     function getVariables()
     {
         $variables = array(
@@ -74,16 +79,13 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         $result = $this->_makeGetRequest('/domains/available', $arguments);
         if ($result == false) {
             $status = 5;
-        }
-        else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz check domain failed with error: ' . $result->message);
             $status = 2;
-        }
-        else if ($result->$domain->status == 'regthroughus' || $result->$domain->status == 'regthroughothers') {
+        } elseif ($result->$domain->status == 'regthroughus' || $result->$domain->status == 'regthroughothers') {
             CE_Lib::log(4, 'Resell.biz check domain result for domain ' . $domain . ': Registered');
             $status = 1;
-        }
-        else if ($result->$domain->status == 'available') {
+        } elseif ($result->$domain->status == 'available') {
             CE_Lib::log(4, 'Resell.biz check domain result for domain ' . $domain . ': Available');
             $status = 0;
         } else {
@@ -99,7 +101,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function doTogglePrivacy($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $status = $this->togglePrivacy($this->buildRegisterParams($userPackage,$params));
+        $status = $this->togglePrivacy($this->buildRegisterParams($userPackage, $params));
         return "Turned privacy {$status} for " . $userPackage->getCustomField('Domain Name') . '.';
     }
 
@@ -124,10 +126,10 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if ($result === false) {
             throw new Exception('A connection issued occurred while connecting to Resell.biz.', EXCEPTION_CODE_CONNECTION_ISSUE);
         }
-        if ( isset($result->isprivacyprotected) ) {
+        if (isset($result->isprivacyprotected)) {
             $privacyStatus = $result->isprivacyprotected;
 
-            if ( $privacyStatus == 'false' ) {
+            if ($privacyStatus == 'false') {
                 $toggled = 'true';
             } else {
                 $toggled = 'false';
@@ -146,17 +148,17 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             if (isset($result->status) && strtolower($result->status) == 'error') {
                 CE_Lib::log(4, 'Error toggling privacy protection: ' . $result->message);
                 throw new Exception('Error toggling privacy protection: ' . $result->message);
-            } else if ( isset($result->actionstatus) && strtolower($result->actionstatus) == 'success' ) {
-                if ( $toggled == 'true' ) {
+            } elseif (isset($result->actionstatus) && strtolower($result->actionstatus) == 'success') {
+                if ($toggled == 'true') {
                     return 'on';
                 } else {
                     return 'off';
                 }
-            }  else {
+            } else {
                 CE_Lib::log(4, 'Error toggling privacy protection: Unknown Reason');
                 throw new Exception('Error toggling privacy protection.');
             }
-        }  else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain details fetch failed with error: ' . $result->message);
             throw new Exception('Error fetching Resell.biz domain details.: ' . $result->message);
         } else {
@@ -175,8 +177,8 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function doRegister($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $orderid = $this->registerDomain($this->buildRegisterParams($userPackage,$params));
-        $userPackage->setCustomField("Registrar Order Id",$userPackage->getCustomField("Registrar").'-'.$orderid[1][0]);
+        $orderid = $this->registerDomain($this->buildRegisterParams($userPackage, $params));
+        $userPackage->setCustomField("Registrar Order Id", $userPackage->getCustomField("Registrar").'-'.$orderid[1][0]);
         return $userPackage->getCustomField('Domain Name') . ' has been registered.';
     }
 
@@ -188,7 +190,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function doRenew($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $orderid = $this->renewDomain($this->buildRenewParams($userPackage,$params));
+        $orderid = $this->renewDomain($this->buildRenewParams($userPackage, $params));
         return $userPackage->getCustomField('Domain Name') . ' has been renewed.';
     }
 
@@ -199,8 +201,10 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
         $newCustomer = false;
         $countrycode = $this->_getCountryCode($params['RegistrantCountry']);
-        $telno = $this->_validatePhone($params['RegistrantPhone'],$countrycode);
-        if ($params['RegistrantOrganizationName'] == "") $params['RegistrantOrganizationName'] = "N/A";
+        $telno = $this->_validatePhone($params['RegistrantPhone'], $countrycode);
+        if ($params['RegistrantOrganizationName'] == "") {
+            $params['RegistrantOrganizationName'] = "N/A";
+        }
         $customerId = $this->_lookupCustomerId($params['RegistrantEmailAddress']);
         if (is_a($customerId, 'CE_Error')) {
             CE_Lib::log(4, 'Error creating Resell.biz customer: ' . $customerId->getMessage());
@@ -228,7 +232,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
             if (is_numeric($result)) {
                 $customerId = $result;
-            } else if (isset($result->status) && $result->status == 'ERROR') {
+            } elseif (isset($result->status) && $result->status == 'ERROR') {
                 CE_Lib::log(4, 'Error creating Resell.biz customer: ' . $result->message);
                 throw new CE_Exception('Error creating Resell.biz customer: ' . $result->message);
             } else {
@@ -254,7 +258,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         );
         // Handle any extra attributes needed
         if (isset($params['ExtendedAttributes']) && is_array($params['ExtendedAttributes'])) {
-            if ( $params['tld'] == 'ca' )  {
+            if ($params['tld'] == 'ca') {
                 $arguments['attr-name1'] = 'CPR';
                 $arguments['attr-value1'] = $params['ExtendedAttributes']['cira_legal_type'];
 
@@ -263,19 +267,17 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
                 $arguments['attr-name3'] = 'AgreementValue';
                 $arguments['attr-value3'] = $params['ExtendedAttributes']['cira_agreement_value'];
-
-            } else if ( $params['tld'] == 'us' ) {
+            } elseif ($params['tld'] == 'us') {
                 $arguments['attr-name1'] = 'purpose';
                 $arguments['attr-value1'] = $params['ExtendedAttributes']['us_purpose'];
 
                 $arguments['attr-name2'] = 'category';
                 $arguments['attr-value2'] = $params['ExtendedAttributes']['us_nexus'];
-
             } else {
                 $i = 0;
                 foreach ($params['ExtendedAttributes'] as $name => $value) {
                     // only pass extended attributes if they have a value.
-                    if ( $value != '' ) {
+                    if ($value != '') {
                         $arguments['attr-name' . $i] = $name;
                         $arguments['attr-value' . $i] = $value;
                         $i++;
@@ -289,7 +291,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if (is_numeric($result)) {
             CE_Lib::log(4, 'Resell.biz contact id created (or retrieved) with a value of ' . $result);
             $contactId = $result;
-        } else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz customer contact creation failed with error: ' . $result->message);
             throw new CE_Exception('Error creating Resell.biz customer contact: ' . $result->message);
         } else {
@@ -317,7 +319,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         }
 
         $purchasePrivacy = false;
-        if ( isset($params['package_addons']['IDPROTECT']) && $params['package_addons']['IDPROTECT'] == 1 ) {
+        if (isset($params['package_addons']['IDPROTECT']) && $params['package_addons']['IDPROTECT'] == 1) {
             $purchasePrivacy = true;
         }
 
@@ -346,10 +348,10 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             return array(1, array($result->entityid));
         }
         if (isset($result->status) && strtolower($result->status) == 'error') {
-            if ( isset($result->message) ) {
+            if (isset($result->message)) {
                 $errorMessage = $result->message;
             }
-            if ( isset($result->error) ) {
+            if (isset($result->error)) {
                 $errorMessage = $result->error;
             }
 
@@ -443,8 +445,8 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function doDomainTransferWithPopup($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $transferid = $this->initiateTransfer($this->buildTransferParams($userPackage,$params));
-        $userPackage->setCustomField("Registrar Order Id",$userPackage->getCustomField("Registrar").'-'.$transferid);
+        $transferid = $this->initiateTransfer($this->buildTransferParams($userPackage, $params));
+        $userPackage->setCustomField("Registrar Order Id", $userPackage->getCustomField("Registrar").'-'.$transferid);
         $userPackage->setCustomField('Transfer Status', $transferid);
         return "Transfer of has been initiated.";
     }
@@ -455,8 +457,10 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
         $newCustomer = false;
         $countrycode = $this->_getCountryCode($params['RegistrantCountry']);
-        $telno = $this->_validatePhone($params['RegistrantPhone'],$countrycode);
-        if ($params['RegistrantOrganizationName'] == "") $params['RegistrantOrganizationName'] = "N/A";
+        $telno = $this->_validatePhone($params['RegistrantPhone'], $countrycode);
+        if ($params['RegistrantOrganizationName'] == "") {
+            $params['RegistrantOrganizationName'] = "N/A";
+        }
         $customerId = $this->_lookupCustomerId($params['RegistrantEmailAddress']);
         if (is_a($customerId, 'CE_Error')) {
             CE_Lib::log(4, 'Error creating Resell.biz customer: ' . $customerId->getMessage());
@@ -484,7 +488,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
             if (is_numeric($result)) {
                 $customerId = $result;
-            } else if (isset($result->status) && $result->status == 'ERROR') {
+            } elseif (isset($result->status) && $result->status == 'ERROR') {
                 CE_Lib::log(4, 'Error creating Resell.biz customer: ' . $result->message);
                 throw new Exception('Error creating Resell.biz customer: ' . $result->message);
             } else {
@@ -514,11 +518,11 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             $i = 1;
             foreach ($params['ExtendedAttributes'] as $name => $value) {
                 // only pass extended attributes if they have a value.
-                if ( $value != '' ) {
-                    if ( $name == 'us_nexus' ) {
+                if ($value != '') {
+                    if ($name == 'us_nexus') {
                         $name = 'category';
                     }
-                    if ( $name == 'us_purpose' ) {
+                    if ($name == 'us_purpose') {
                         $name = 'purpose';
                     }
 
@@ -534,7 +538,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if (is_numeric($result)) {
             CE_Lib::log(4, 'Resell.biz contact id created (or retrieved) with a value of ' . $result);
             $contactId = $result;
-        } else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz customer contact creation failed with error: ' . $result->message);
             throw new Exception('Error creating Resell.biz customer contact: ' . $result->message);
         } else {
@@ -568,13 +572,10 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if (isset($result->status) && strtolower($result->status) == 'adminapproved' || strtolower($result->status) == 'success') {
             CE_Lib::log(4, 'Resell.biz domain transfer of ' . $domain . ' successful.  EntityId: ' . $result->entityid);
             return $result->entityid;
-        }
-
-
-        else if (isset($result->status) && strtolower($result->status) == 'error') {
+        } elseif (isset($result->status) && strtolower($result->status) == 'error') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain transfer failed with error: ' . $result->error);
             throw new Exception('Error transfering Resell.biz domain: ' . $result->error);
-        } else if ( isset($result->status) && strtolower($result->status) == 'failed') {
+        } elseif (isset($result->status) && strtolower($result->status) == 'failed') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain transfer failed with error: ' . $result->actiontypedesc);
             throw new Exception('Error transfering Resell.biz domain: ' . $result->actiontypedesc);
         } else {
@@ -613,22 +614,21 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             if (isset($result->status) && strtolower($result->status) == 'error') {
                 CE_Lib::log(4, 'ERROR: Resell.biz domain transfer failed with error: ' . $result->error);
                 throw new Exception('Error transfering Resell.biz domain: ' . $result->error);
-            }
-            else if ( isset($result->status) && strtolower($result->status) == 'failed') {
+            } elseif (isset($result->status) && strtolower($result->status) == 'failed') {
                 CE_Lib::log(4, 'ERROR: Resell.biz domain transfer failed with error: ' . $result->actiontypedesc);
                 throw new Exception('Error transfering Resell.biz domain: ' . $result->actiontypedesc);
             }
             $status = $result->{1}->actionstatusdesc;
-            if ( $status == 'Domain Transfered Successfully.' ) {
+            if ($status == 'Domain Transfered Successfully.') {
                 $userPackage->setCustomField('Transfer Status', 'Completed');
             }
             return $status;
-        } else if ( isset($result->status) && strtolower($result->status) == 'failed') {
+        } elseif (isset($result->status) && strtolower($result->status) == 'failed') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain transfer failed with error: ' . $result->actiontypedesc);
             throw new Exception('Error transfering Resell.biz domain: ' . $result->actiontypedesc);
         }
         $status = $result->{1}->actionstatusdesc;
-        if ( $status == 'Domain Transfered Successfully.' ) {
+        if ($status == 'Domain Transfered Successfully.') {
             $userPackage->setCustomField('Transfer Status', 'Completed');
         }
 
@@ -714,7 +714,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         }
         if (isset($result->registrantcontact)) {
             $contactId = $result->registrantcontact->contactid;
-        } else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain registrant contact fetch failed with error: ' . $result->message);
             throw new Exception('Error fetching Resell.biz domain registrant details.: ' . $result->message);
         } else {
@@ -722,7 +722,9 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             throw new Exception('Error fetching Resell.biz domain registrant details.');
         }
 
-        if ($params['Registrant_OrganizationName'] == "") $params['Registrant_OrganizationName'] = "N/A";
+        if ($params['Registrant_OrganizationName'] == "") {
+            $params['Registrant_OrganizationName'] = "N/A";
+        }
 
         $arguments = array(
             'contact-id'            => $contactId,
@@ -942,18 +944,18 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain search failed with error: ' . $result->message);
             throw new Exception('Error during Resell.biz domain search command.: ' . $result->message);
-        } else if (!isset($result->recsonpage)) {
+        } elseif (!isset($result->recsonpage)) {
             CE_Lib::log(4, 'ERROR: Resell.biz domain search failed with an error.');
             throw new Exception('Error during Resell.biz domain search command.');
         }
 
+        $domainNameGateway = new DomainNameGateway();
         $domainsList = array();
         $name = 'entity.description';
         $orderid = 'orders.orderid';
         $expiry = 'orders.endtime';
         for ($i = 1; $i <= $result->recsonpage; $i++) {
-            CE_Lib::log(4, 'Working on domain: ' . $result->$i->$name);
-            $dom = $this->splitDomain($result->$i->$name);
+            $dom = $domainNameGateway->splitDomain($result->$i->$name);
             $domainsList[] = array(
                 'id'    => $result->$i->$orderid,
                 'sld'   => $dom[0],
@@ -967,7 +969,6 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         $metaData['end'] = $page * 25;
         $metaData['next'] = $page * 25 + 1;
         $metaData['numPerPage'] = 25;
-        CE_Lib::log(4, "Returing array of size: " . sizeof($domainsList));
         return array($domainsList, $metaData);
     }
 
@@ -1001,7 +1002,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         if (isset($result->transferlock)) {
             // transfer lock is enabled
             return $result->transferlock;
-        } else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain registrant contact fetch failed with error: ' . $result->message);
             throw new Exception('Error fetching Resell.biz domain registrant details.: ' . $result->message);
         } else {
@@ -1013,7 +1014,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function doSetRegistrarLock($params)
     {
         $userPackage = new UserPackage($params['userPackageId']);
-        $this->setRegistrarLock($this->buildLockParams($userPackage,$params));
+        $this->setRegistrarLock($this->buildLockParams($userPackage, $params));
         return "Updated Registrar Lock.";
     }
 
@@ -1029,7 +1030,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             'order-id'      => $domainId,
         );
 
-        if ( $params['lock'] == true ) {
+        if ($params['lock'] == true) {
             $url = '/domains/enable-theft-protection';
         } else {
             $url = '/domains/disable-theft-protection';
@@ -1041,7 +1042,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
         if (isset($result->status) && $result->status == 'Success') {
             return;
-        } else if (isset($result->status) && $result->status == 'ERROR') {
+        } elseif (isset($result->status) && $result->status == 'ERROR') {
             CE_Lib::log(4, 'ERROR: Resell.biz domain registrant contact fetch failed with error: ' . $result->message);
             throw new Exception('Error fetching Resell.biz domain registrant details.: ' . $result->message);
         } else {
@@ -1084,14 +1085,16 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
     function _makeRequest($servlet, $arguments, $isPost = false)
     {
         $arguments['auth-userid'] = $this->settings->get('plugin_resellbiz_Reseller ID');
-        if ( $this->settings->get('plugin_resellbiz_API Key') != '' ) {
-           $arguments['api-key'] = $this->settings->get('plugin_resellbiz_API Key');
+        if ($this->settings->get('plugin_resellbiz_API Key') != '') {
+            $arguments['api-key'] = $this->settings->get('plugin_resellbiz_API Key');
         } else {
-           $arguments['auth-password'] = $this->settings->get('plugin_resellbiz_Password');
+            $arguments['auth-password'] = $this->settings->get('plugin_resellbiz_Password');
         }
 
         $request = 'https://';
-        if (@$this->settings->get('plugin_resellbiz_Use testing server')) $request .= 'test.';
+        if (@$this->settings->get('plugin_resellbiz_Use testing server')) {
+            $request .= 'test.';
+        }
         $request .= 'httpapi.com/api';
         $request .= $servlet . '.json';
 
@@ -1103,13 +1106,19 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             if (is_array($value)) {
                 // Need to handle arrays
                 foreach ($value as $multivalue) {
-                    if ($multivalue === true) $multivalue = 'true';
-                    else if ($multivalue === false) $multivalue = 'false';
+                    if ($multivalue === true) {
+                        $multivalue = 'true';
+                    } elseif ($multivalue === false) {
+                        $multivalue = 'false';
+                    }
                     $data .= $name . '=' . urlencode($multivalue) . '&';
                 }
             } else {
-                if ($value === true) $value = 'true';
-                else if ($value === false) $value = 'false';
+                if ($value === true) {
+                    $value = 'true';
+                } elseif ($value === false) {
+                    $value = 'false';
+                }
                 $data .= $name . '=' . urlencode($value) . '&';
             }
         }
@@ -1124,15 +1133,15 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         CE_Lib::log(4, 'Resell.biz request: ' . $request);
 
         // certificate validation doesn't work well under windows
-		$requestType = ($isPost) ? 'POST' : 'GET';
+        $requestType = ($isPost) ? 'POST' : 'GET';
         $response = NE_Network::curlRequest($this->settings, $request, $postData, false, true, false, $requestType);
 
         CE_Lib::log(4, 'Resell.biz response: ' . $response);
 
         if (is_a($response, 'CE_Error')) {
-           CE_Lib::log(4, 'Error communicating with Resell.biz: ' . $response->getMessage());
-           throw new Exception('Error communicating with Resell.biz: ' . $response->getMessage());
-        } else if (!$response) {
+            CE_Lib::log(4, 'Error communicating with Resell.biz: ' . $response->getMessage());
+            throw new Exception('Error communicating with Resell.biz: ' . $response->getMessage());
+        } elseif (!$response) {
             CE_Lib::log(4, 'Error communicating with Resell.biz: No response found.');
             throw new Exception('Error communicating with Resell.biz: No response found.');
         }
@@ -1146,7 +1155,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
             'username' => $email,
         );
         $result = $this->_makeGetRequest('/customers/details', $arguments);
-		if ($result === false) {
+        if ($result === false) {
             throw new Exception('A connection issued occurred while connecting to Resell.biz.');
         }
 
@@ -1263,22 +1272,14 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
         return serialize($dotUs);
     }
 
-    function disableRenewal ($params)
+    function disableRenewal($params)
     {
         throw new Exception('Method disableRenewal() was not implemented yet.');
     }
 
-    function checkNSStatus ($params)
+    function checkNSStatus($params)
     {
         throw new Exception('Method checkNSStatus() was not implemented yet.');
-    }
-
-    function splitDomain($domain)
-    {
-        if (($position = strpos($domain, '.')) === false) {
-            return array($domain, '');
-        }
-        return array(mb_substr($domain, 0, $position), mb_substr($domain, $position + 1));
     }
 
     function disablePrivateRegistration($parmas)
@@ -1288,7 +1289,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
     private function getAdminContactId($tld, $contactId)
     {
-        switch ( $tld ) {
+        switch ($tld) {
             case 'eu':
             case 'nz':
             case 'ru':
@@ -1309,7 +1310,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
     private function getBillingContactId($tld, $contactId)
     {
-        switch ( $tld ) {
+        switch ($tld) {
             case 'berlin':
             case 'ca':
             case 'eu':
@@ -1327,7 +1328,7 @@ class PluginResellbiz extends RegistrarPlugin implements ICanImportDomains
 
     private function getContactType($params)
     {
-        switch($params['tld']) {
+        switch ($params['tld']) {
             case 'ca':
                 $contactType = 'CaContact';
                 break;
